@@ -1,0 +1,55 @@
+
+
+CREATE COMPUTE MODULE ESB_01_CUSTOMER_RP_PROCESS
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		
+		
+		SET Environment.Variables.FlowId = 'ESB_01_RP';
+		SET Environment.Variables.MsgType =  FIELDNAME(InputRoot.XMLNSC.(XMLNSC.Folder)[1]);
+		SET Environment.Variables.Auditlog = 'ESB_01_RP Starting';
+		SET Environment.Variables.TransactionStatus = 'unprocess';
+		SET Environment.Variables.BusinessStatus = 'unprocess';
+		DECLARE QUERY CHARACTER;
+		
+		SET OutputRoot = InputRoot;
+		
+		IF  Environment.Variables.MsgType = 'GET_CUSTOMER_RP' THEN
+			SET QUERY = 'SELECT OTHER_PARAM FROM ESB.CUSTOMER_PARAM WHERE CORE_PARAM = ?';
+			SET Environment.Variables.param = PASSTHRU(QUERY, InputRoot.XMLNSC.GET_CUSTOMER_RP.CUSTOMER_DATA.TYPE);
+		
+			IF CARDINALITY(Environment.Variables.param[]) > 0 THEN
+				SET OutputRoot.XMLNSC.CREATE_CUSTOMER_RP.CUSTOMER_DATA.TYPE = Environment.Variables.param.OTHER_PARAM;
+				SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '|TYPE_CHANGED';
+			END IF;
+		END IF;
+		SET Environment.Variables.TransactionStatus = 'processed';
+		SET Environment.Variables.BusinessStatus = 'processed';
+		
+		IF InputRoot.MQMD.ReplyToQ = 'Mobil.In' THEN
+			SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '|FORWARD TO MOBIL';
+			PROPAGATE TO TERMINAL  'out';
+		ELSEIF InputRoot.MQMD.ReplyToQ = 'Online.In' THEN
+			SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '|FORWARD TO ONLINE';
+			PROPAGATE TO TERMINAL  'out1';
+		ELSE
+			SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '|UNKNOW DESTINATION';
+		 	PROPAGATE TO TERMINAL  'out2';
+		END IF;
+		RETURN FALSE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

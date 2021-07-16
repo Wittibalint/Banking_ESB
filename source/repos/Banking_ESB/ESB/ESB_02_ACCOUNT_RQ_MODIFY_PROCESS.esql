@@ -1,0 +1,63 @@
+
+
+CREATE COMPUTE MODULE ESB_02_ACCOUNT_RQ_MODIFY_PROCESS
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		IF COALESCE(InputRoot.XMLNSC.MODIFY_ACCOUNT_RQ.ACCOUNT_DATA.ACCOUNTID, '') = '' THEN
+			
+			CALL CreateMessageHeader();
+			
+			CREATE FIELD OutputRoot.XMLNSC.MODIFY_ACCOUNT_RP;
+			DECLARE OUTPUT REFERENCE TO OutputRoot.XMLNSC.MODIFY_ACCOUNT_RP;
+			SET OUTPUT.DESTINATION = COALESCE(InputRoot.XMLNSC.MODIFY_ACCOUNT_RQ.SOURCE,'');
+			SET OUTPUT.ERROR_CODE = '9001';
+			SET OUTPUT.ERROR_DESC = 'EMPTY ACCOUNTID';
+			SET Environment.Variables.TransactionStatus = 'processed';
+			SET Environment.Variables.BusinessStatus = 'failure';
+			PROPAGATE TO TERMINAL 'out1';
+			RETURN FALSE;
+		END IF;
+		
+		SET OutputRoot = InputRoot;
+	
+		SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '| FORWARD TO CORE';
+		SET Environment.Variables.TransactionStatus = 'processed';
+		SET Environment.Variables.BusinessStatus = 'processed';
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CreateMessageHeader()
+	BEGIN
+		SET OutputRoot.MQMD.MsgType = 2;
+		SET OutputRoot.MQMD.Expiry = InputRoot.MQMD.Expiry;
+		SET OutputRoot.MQMD.CodedCharSetId = 1208;
+		SET OutputRoot.MQMD.Format = 'MQHRF2';
+		SET OutputRoot.MQMD.Priority = InputRoot.MQMD.Priority;
+		SET OutputRoot.MQMD.Persistence = InputRoot.MQMD.Persistence;
+		SET OutputRoot.MQMD.MsgId = CAST('ESB' || LEFT(REPLACE(UUIDASCHAR,'-',''),21) AS BLOB CCSID OutputRoot.MQMD.CodedCharSetId);
+		SET OutputRoot.MQMD.CorrelId = InputRoot.MQMD.CorrelId;
+		SET OutputRoot.MQMD.ReplyToQMgr = InputRoot.MQMD.ReplyToQMgr;
+		SET OutputRoot.MQMD.ReplyToQ = InputRoot.MQMD.ReplyToQ;
+		
+		SET OutputRoot.MQRFH2.(MQRFH2.Field)Version = 2;
+		SET OutputRoot.MQRFH2.(MQRFH2.Field)Format = '';
+		SET OutputRoot.MQRFH2.(MQRFH2.Field)Encoding = MQENC_NATIVE;
+		SET OutputRoot.MQRFH2.(MQRFH2.Field)CodedCharSetId = 1208;
+		SET OutputRoot.MQRFH2.(MQRFH2.Field)Flags = 0;
+		SET OutputRoot.MQRFH2.(MQRFH2.Field)NameValueCCSID = 1208;
+		SET OutputRoot.MQRFH2.mcd.Msd = 'none';
+		SET OutputRoot.MQRFH2.mcd.Set = '';
+		SET OutputRoot.MQRFH2.mcd.Type = 'MODIFY_ACCOUNT_RP';
+		SET OutputRoot.MQRFH2.mcd.Fmt = '';
+	END;
+END MODULE;

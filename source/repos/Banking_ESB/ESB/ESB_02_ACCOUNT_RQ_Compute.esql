@@ -1,0 +1,47 @@
+
+
+CREATE COMPUTE MODULE ESB_02_ACCOUNT_RQ_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET Environment.Variables.FlowId = 'ESB_02_RQ';
+		SET Environment.Variables.MsgType =  FIELDNAME(InputRoot.XMLNSC.(XMLNSC.Folder)[1]);
+		SET Environment.Variables.Auditlog = 'ESB_02_RQ Starting';
+		IF Environment.Variables.MsgType IS NOT NULL THEN
+			SET Environment.Variables.Auditlog = COALESCE(Environment.Variables.Auditlog) || '| RootMsgType: ' || Environment.Variables.MsgType;
+			CASE
+				WHEN Environment.Variables.MsgType = 'CREATE_ACCOUNT_RQ' THEN SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = 'CREATE_ACCOUNT_RQ';
+       			WHEN Environment.Variables.MsgType = 'MODIFY_ACCOUNT_RQ' THEN SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = 'MODIFY_ACCOUNT_RQ';
+       			WHEN Environment.Variables.MsgType = 'GET_ACCOUNT_RQ' THEN SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = 'GET_ACCOUNT_RQ';
+       			WHEN Environment.Variables.MsgType = 'DELETE_ACCOUNT_RQ' THEN SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = 'DELETE_ACCOUNT_RQ';
+       			WHEN Environment.Variables.MsgType = 'TRANSACTION_HISTORY_RQ' THEN SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = 'TRANSACTION_HISTORY_RQ';
+       		ELSE 
+				SET Environment.Variables.Auditlog = Environment.Variables.Auditlog || '|Unknow message type RootMsgType: ' || Environment.Variables.MsgType;
+				SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = 'UNKNOW';
+				SET Environment.Variables.TransactionStatus = 'unprocess';
+				SET Environment.Variables.BusinessStatus = 'unprocess';
+			END CASE;
+		ELSE
+			SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '|Unknow message type | RootMsgType: NULL |';
+			SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = 'UNKNOW';
+			SET Environment.Variables.TransactionStatus = 'unprocess';
+			SET Environment.Variables.BusinessStatus = 'unprocess';
+		END IF;
+		
+		SET OutputRoot = InputRoot;
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

@@ -1,0 +1,26 @@
+
+
+CREATE COMPUTE MODULE ESB_01_CUSTOMER_RQ_CREATE_PROCESS
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		DECLARE QUERY CHARACTER;
+		CALL CopyEntireMessage();
+		
+		SET QUERY = 'SELECT CORE_PARAM FROM ESB.CUSTOMER_PARAM WHERE OTHER_PARAM = ?';
+		SET Environment.Variables.param = PASSTHRU(QUERY, InputRoot.XMLNSC.CREATE_CUSTOMER_RQ.CUSTOMER_DATA.TYPE);
+		
+		IF CARDINALITY(Environment.Variables.param[]) > 0 THEN
+			SET OutputRoot.XMLNSC.CREATE_CUSTOMER_RQ.CUSTOMER_DATA.TYPE = Environment.Variables.param.CORE_PARAM;
+			SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '|TYPE_CHANGED';
+		END IF;
+	
+		SET Environment.Variables.Auditlog =  COALESCE(Environment.Variables.Auditlog) || '|FORWARD TO CORE';
+		SET Environment.Variables.TransactionStatus = 'processed';
+		SET Environment.Variables.BusinessStatus = 'processed';
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

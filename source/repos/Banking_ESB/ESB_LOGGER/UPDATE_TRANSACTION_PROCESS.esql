@@ -1,0 +1,31 @@
+
+
+CREATE COMPUTE MODULE UPDATE_TRANSACTION_PROCESS
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		UPDATE Database.ESB.TRANSACTION_HISTORY AS TH
+			SET OUTGOING_TIMESTAMP	= InputRoot.MQRFH2.usr.OUTGOINT_MSG_TIMESTAMP,
+			MSG_TYPE				= InputRoot.MQRFH2.usr.MSGTYPE,
+			OUTGOING_MSG			= InputRoot.BLOB.BLOB,
+			AUDITLOG				= InputRoot.MQRFH2.usr.Auditlog,
+			TRANSACTION_STATUS		= InputRoot.MQRFH2.usr.TransactionStatus,
+			BUSINESS_STATUS			= InputRoot.MQRFH2.usr.BusinessStatus,
+			FLOW_ID 				= InputRoot.MQRFH2.usr.FlowId
+			WHERE TH.TRANSACTION_ID = InputRoot.MQRFH2.usr.Transaction_Id;
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;
